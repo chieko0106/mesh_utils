@@ -50,7 +50,8 @@ with open('node.out','w') as f:#初始化nodeout文件，存储网格结点信�
             f.write(str(Nnode) + "\t")
             f.write("{:.{}e}".format(gridx[j][i],3) + "\t")
             f.write("{:.{}e}".format(gridy[j][i],3) + "\t")
-            f.write("{:.{}e}".format(zi0[j][i],3) + "\n")
+            f.write("{:.{}e}".format(zi0[j][i],3) + "\t")
+            f.write("0"+"\n")
 f.close()
 with open('mesh.out','w') as m:#初始化meshout文件，存储网格拓扑信息，包括材料编号
     m.write("#No"+"\t"+"MAT"+"\t"
@@ -63,6 +64,9 @@ with open('mesh.out','w') as m:#初始化meshout文件，存储网格拓扑信�
             +"node7"+"\t"
             +"node8"+"\t"+"\n")
 m.close()
+with open('notion.out','w') as n:
+    print('notion created')
+n.close()
 all_data = In.mat
 x0 = all_data[0]['X']
 y0 = all_data[0]['Y']
@@ -71,6 +75,7 @@ triang0 = mtri.Triangulation(x0, y0)
 interp_z0 = mtri.LinearTriInterpolator(triang0, z0)
 zi0 = interp_z0(gridx,gridy)
 all_data.pop(0)
+surface = True
 for lower in all_data:
     x = lower['X']
     y = lower['Y']
@@ -80,19 +85,41 @@ for lower in all_data:
     triang = mtri.Triangulation(x, y)
     interp_z = mtri.LinearTriInterpolator(triang, z)
     zi = interp_z(gridx, gridy)
-    with open('node.out','a') as f ,open('mesh.out','a') as m:
+    with open('node.out','a') as f ,open('mesh.out','a') as m,open('notion.out','a') as n:
         for k in range(sizez):
             for j in range(numy):
                 for i in range(numx):
                     #结点
+                    xx = gridx[j][i]
+                    yy = gridy[j][i]
                     Nnode = Nnode + 1
                     f.write(str(Nnode) + "\t")
-                    f.write("{:.{}e}".format(gridx[j][i],3) + "\t")
-                    f.write("{:.{}e}".format(gridy[j][i],3) + "\t")
+                    f.write("{:.{}e}".format(xx,3) + "\t")
+                    f.write("{:.{}e}".format(yy,3) + "\t")
                     zi1 = zi[j][i]
                     zi2 = zi0[j][i]
                     zz = zi2-(k+1)*(zi2-zi1)/sizez
-                    f.write("{:.{}e}".format(zz,3) + "\n")
+                    f.write("{:.{}e}".format(zz,3) + "\t")
+                    f.write(str(Nmat)+"\n")
+
+                    if xx == minx:
+                        n.write('00')
+                        n.write('\n')
+                    elif xx == maxx:
+                        n.write('01')
+                        n.write('\n')
+                    elif yy == miny:
+                        n.write('10')
+                        n.write('\n')
+                    elif yy == maxy:
+                        n.write('11')
+                        n.write('\n') 
+                    elif surface and k == 0:
+                        n.write('33') # 最表面点标记为33
+                        n.write('\n') 
+                    else:
+                        n.write('99') #内部点标记为99
+                        n.write('\n') 
                     #拓扑
                     NnodeinTP = NnodeinTP +1
                     if i == numx - 1 or j == numy - 1:
@@ -107,9 +134,9 @@ for lower in all_data:
                     m.write(str(NnodeinTP + NN)+"\t") # 结点5
                     m.write(str(NnodeinTP + NN + 1)+"\t") # 结点6
                     m.write(str(NnodeinTP + NN + numx + 1)+"\t") # 结点7
-                    m.write(str(NnodeinTP + NN + numx)+"\n") # 结点8                    
+                    m.write(str(NnodeinTP + NN + numx)+"\n") # 结点8
                     
-                    
+    surface = False
     x0 = x
     y0 = y
     z0 = z
@@ -149,6 +176,8 @@ if tecplot:
         t.write('"Y(m)"')
         t.write('\n')
         t.write('"Z(m)"')
+        t.write('\n')
+        t.write('"MAT(m)"')
         t.write('\n')
         t.write('ZONE T="MI= 1  MAT=  1"')
         t.write('\n')
