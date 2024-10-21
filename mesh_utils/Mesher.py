@@ -6,6 +6,7 @@
 import numpy as np
 import matplotlib.tri as mtri
 from read import F
+from tool import binary_to_decimal
 
 # 需要从UI输入的参数
 # 设定计算场地范围，这个范围必须在的散点范围内，不能在散点范围外
@@ -47,11 +48,24 @@ with open('node.out','w') as f:#初始化nodeout文件，存储网格结点信�
     for j in range(numy):
         for i in range(numx):
             Nnode = Nnode + 1
+            xx = gridx[j][i]
+            yy = gridy[j][i]
             f.write(str(Nnode) + "\t")
-            f.write("{:.{}e}".format(gridx[j][i],3) + "\t")
-            f.write("{:.{}e}".format(gridy[j][i],3) + "\t")
+            f.write("{:.{}e}".format(xx,3) + "\t")
+            f.write("{:.{}e}".format(yy,3) + "\t")
             f.write("{:.{}e}".format(zi0[j][i],3) + "\t")
-            f.write("0"+"\n")
+            f.write("0"+"\t")
+            typebinary = "000011"
+            if xx == minx:
+                typebinary = '10' + typebinary[2:]
+            if xx == maxx:
+                typebinary = '11' + typebinary[2:]
+            if yy == miny:
+                typebinary = typebinary[:2] + '10' + typebinary[4:]
+            if yy == maxy:
+                typebinary = typebinary[:2] + '11' + typebinary[4:]
+            typed = str(binary_to_decimal(typebinary))
+            f.write(typed+"\n")
 f.close()
 with open('mesh.out','w') as m:#初始化meshout文件，存储网格拓扑信息，包括材料编号
     m.write("#No"+"\t"+"MAT"+"\t"
@@ -75,8 +89,7 @@ triang0 = mtri.Triangulation(x0, y0)
 interp_z0 = mtri.LinearTriInterpolator(triang0, z0)
 zi0 = interp_z0(gridx,gridy)
 all_data.pop(0)
-surface = True
-for lower in all_data:
+for index,lower in enumerate(all_data):
     x = lower['X']
     y = lower['Y']
     z = lower['Z']
@@ -100,26 +113,23 @@ for lower in all_data:
                     zi2 = zi0[j][i]
                     zz = zi2-(k+1)*(zi2-zi1)/sizez
                     f.write("{:.{}e}".format(zz,3) + "\t")
-                    f.write(str(Nmat)+"\n")
-
+                    f.write(str(Nmat)+"\t")
+                    typebinary = "000000"
                     if xx == minx:
-                        n.write('00')
-                        n.write('\n')
-                    elif xx == maxx:
-                        n.write('01')
-                        n.write('\n')
-                    elif yy == miny:
-                        n.write('10')
-                        n.write('\n')
-                    elif yy == maxy:
-                        n.write('11')
-                        n.write('\n') 
-                    elif surface and k == 0:
-                        n.write('33') # 最表面点标记为33
-                        n.write('\n') 
-                    else:
-                        n.write('99') #内部点标记为99
-                        n.write('\n') 
+                        typebinary = '10' + typebinary[2:]
+                    if xx == maxx:
+                        typebinary = '11' + typebinary[2:]
+                    if yy == miny:
+                        typebinary = typebinary[:2] + '10' + typebinary[4:]
+                    if yy == maxy:
+                        typebinary = typebinary[:2] + '11' + typebinary[4:]
+                    if k == sizez-1 and index == len(all_data)-1:
+                        typebinary = typebinary[:4] + '10'
+                    typed = str(binary_to_decimal(typebinary))
+                    f.write(typed)
+                    f.write('\n')
+                    n.write(typed)
+                    n.write('\n')
                     #拓扑
                     NnodeinTP = NnodeinTP +1
                     if i == numx - 1 or j == numy - 1:
@@ -136,7 +146,6 @@ for lower in all_data:
                     m.write(str(NnodeinTP + NN + numx + 1)+"\t") # 结点7
                     m.write(str(NnodeinTP + NN + numx)+"\n") # 结点8
                     
-    surface = False
     x0 = x
     y0 = y
     z0 = z
@@ -177,7 +186,9 @@ if tecplot:
         t.write('\n')
         t.write('"Z(m)"')
         t.write('\n')
-        t.write('"MAT(m)"')
+        t.write('"MAT"')
+        t.write('\n')
+        t.write('"BC"')
         t.write('\n')
         t.write('ZONE T="MI= 1  MAT=  1"')
         t.write('\n')
