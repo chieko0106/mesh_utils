@@ -14,9 +14,9 @@ minx = 0.0
 maxx = 1000.0
 miny = 0.0
 maxy = 1500.0
-numx = 100 #x方向上需要剖分几个网格
-numy = 150 #y方向上需要剖分几个网格
-all_sizez = [10,5,10,10,10] #每个材料层在z方向上剖分几个网格
+numx = 9 #x方向上需要剖分几个网格
+numy = 8 #y方向上需要剖分几个网格
+all_sizez = [3,2,3,3,3] #每个材料层在z方向上剖分几个网格
 path = '/home/momo/geos/mesh_utils/' # 文件路径
 file = 'points-large.in' #文件名
 
@@ -43,6 +43,7 @@ zi0 = interp_z0(gridx,gridy)
 Nnode = 0
 NnodeinTP = 0
 Ntp = 0
+NdType = []
 with open('node.out','w') as f:#初始化nodeout文件，存储网格结点信息，并且写入最表层的node
     f.write('#NodeNum----x----y----z'+"\n")
     for j in range(numy):
@@ -65,7 +66,9 @@ with open('node.out','w') as f:#初始化nodeout文件，存储网格结点信�
             if yy == maxy:
                 typebinary = typebinary[:2] + '11' + typebinary[4:]
             typed = str(binary_to_decimal(typebinary))
+            NdType.append(typebinary)
             f.write(typed+"\n")
+            
 f.close()
 with open('mesh.out','w') as m:#初始化meshout文件，存储网格拓扑信息，包括材料编号
     m.write("#No"+"\t"+"MAT"+"\t"
@@ -125,6 +128,7 @@ for index,lower in enumerate(all_data):
                         typebinary = typebinary[:2] + '11' + typebinary[4:]
                     if k == sizez-1 and index == len(all_data)-1:
                         typebinary = typebinary[:4] + '10'
+                    NdType.append(typebinary)
                     typed = str(binary_to_decimal(typebinary))
                     f.write(typed)
                     f.write('\n')
@@ -206,4 +210,71 @@ if tecplot:
         for item in content2:
             t.write(item)
             t.write('\n')
+
+print('tecplot file is ready')
+
+vtk = True
+if vtk:
+    temp_dic = {}
+    typecode = 80
+    print('making vtk file')
+    content1 = []
+    content2 = []
+    content3 = []
+    with open('node.out','r') as f:
+        for line in f:
+            if line[0] == '#': # 跳过标识行
+                continue
+            line = line[0:-1]
+            line = line.split()
+            line.pop(0)
+            line.pop(-1) 
+            line.pop(-1) 
+            content1.append(' '.join(line))
+    with open('mesh.out','r') as f:
+        for line in f:
+            if line[0] == '#': # 跳过标识行
+                continue
+            line = line[0:-1]
+            line = line.split()
+            line.pop(0)
+            line.pop(0)
+            incremented_line = [str(int(item) - 1) for item in line]
+            content2.append( ' '.join(incremented_line))
+    ttnd = len(content1)
+    tttp = len(content2)
+    with open('mesh.vtk','w') as t:
+        t.write('# vtk DataFile Version 2.0\n')
+        t.write('Created by MOMOMesher\n')
+        t.write('ASCII\n')
+        t.write('DATASET UNSTRUCTURED_GRID\n')
+        t.write(f'POINTS {ttnd} double\n')
+        for item in content1:
+            t.write(item)
+            t.write('\n')
+        t.write(f'CELLS {tttp} \t {tttp*9} \n')
+        for item in content2:
+            t.write('8\t')
+            t.write(item)
+            t.write('\n')
+        t.write(f'CELL_TYPES {tttp} \n')
+        for item in content2:
+            t.write('12\n')
+        t.write(f'CELL_DATA {tttp} \n')
+        t.write('SCALARS CellEntityIds int 1 \n')
+        t.write('LOOKUP_TABLE defult \n')
+        for item in content2:
+            item = item.split()
+            typeII = ''
+            for nd in item:
+                nd = int(nd)
+                typeII=typeII + NdType[nd]
+            if typeII in temp_dic.keys():
+                t.write(f'{temp_dic[typeII]}\n')
+            else:
+                temp_dic[typeII] = typecode
+                t.write(f'{typecode}\n')
+                typecode = typecode + 1
+
+
 print('end')
